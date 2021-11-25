@@ -153,7 +153,7 @@ max_grad_norm = 1.0
 weight_decay = 0.
 
 logging_steps = 5000
-logging_steps = 1
+# logging_steps = 1
 
 save_steps = 5000
 max_steps = 150000
