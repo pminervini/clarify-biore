@@ -8,8 +8,6 @@ import random
 import numpy as np
 import torch
 
-from torch import Tensor
-
 from sklearn import metrics
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 from torch.utils.data import DataLoader, SequentialSampler, TensorDataset
@@ -19,17 +17,10 @@ import config
 from utils.utils import TriplesReader as read_triples
 from utils.utils import read_relations, read_entities
 
-from typing import Dict, List, Tuple, Set
+from typing import Dict, Tuple, List, Set, Iterable, Any
+
 
 class AverageMeter(object):
-    """
-    Computes and stores the average and current value of metrics.
-
-    Taken from:
-    	https://github.com/thunlp/OpenNRE/blob/master/opennre/framework/utils.py
-
-    """
-
     def __init__(self):
         self.reset()
 
@@ -64,11 +55,17 @@ def set_seed():
     torch.cuda.manual_seed(seed)
 
 
-def compute_metrics(logits, labels, groups, set_type, logger, ent_types=False):
+# For each element in the batch, given the:
+#   - label logits,
+#   - gold labels, and
+#   - source and target entity indices of the triple,
+# compute
+def compute_metrics(logits, labels, groups, set_type, logger, ent_types=False) -> Dict[str, Any]:
     #   - eval['logits'] is [B * N, C]
     #   - eval['labels'] is [B * N]
     #   - eval['names'] is [B * N, G, 2] -- note that B=1 in the code
-    # wait so groups is eval['names']
+    #   - eval['groups'] is [B * N, 2] -- note that B=1 in the code
+    # groups was eval['names'] originally, called from train-cli.py
 
     # Read relation mappings and triples
     if ent_types:
@@ -85,8 +82,10 @@ def compute_metrics(logits, labels, groups, set_type, logger, ent_types=False):
             # entities.txt
             entity2idx = read_entities(config.entities_file)
     else:
+        # Get the entity-to-id and relation-to-id mappings from entities.txt and relations.txt
         rel2idx = read_relations(config.relations_file)
         entity2idx = read_entities(config.entities_file)
+
         if set_type == "dev":
             # triples_dev.tsv
             triples_file = config.triples_file_dev
@@ -94,7 +93,7 @@ def compute_metrics(logits, labels, groups, set_type, logger, ent_types=False):
             # triples_test.tsv
             triples_file = config.triples_file_test
 
-    # Read triples, where we have indices instead of entity names
+    # Read triples, where we have indices instead of entity names, and does not include 'na' triples
     triples: Set[Tuple[int, str, int]] = set()
 
     print('Loaded ', triples_file)
@@ -109,41 +108,66 @@ def compute_metrics(logits, labels, groups, set_type, logger, ent_types=False):
     probas = logits # [B * N, C]
     re_preds = list()
 
-    # For each of the B * N entries in probas = logits ..
+    # For each of the B * N instances ..
     for i in range(probas.size(0)):
-        # group has shape [G, 2]
+        # group has shape [2]
         group = groups[i]
 
-        # This does not make sense at all -- group is [G, 2]
+        # Let's get the two items from the group, ie. the source and the target entities ..
         src, tgt = group[0].item(), group[1].item()
 
         top_prediction = torch.argmax(probas[i])
+
+        # For each possible relation types ..
         for rel, rel_idx in rel2idx.items():
             if rel != "na":
+
+                # For instance i, take the logit of that relation type ..
                 score = probas[i][rel_idx].item()
+
+                # And add it to the possible predictions, in re_preds.
+                # WE NEED ALL POSSIBLE PREDICTIONS BECAUSE THI IS A RANKING TASK NOW.
                 re_preds.append({
-                    "src": src, "tgt": tgt,
+                    "src": src,
+                    "tgt": tgt,
                     "relation": rel,
                     "score": score
                 })
 
     # Adopted from:
     # https://github.com/thunlp/OpenNRE/blob/master/opennre/framework/data_loader.py#L230
+
+    # Sort the predictions based on their scores
     sorted_re_preds = sorted(re_preds, key=lambda x: x["score"], reverse=True)
+
+    # Remove duplicate triples from sorted_re_preds
     sorted_re_preds = non_dup_ordered_seq(sorted_re_preds)
+
     P = list()
     R = list()
+
     correct = 0
     total = len(triples)
 
+    # For each prediction dictionary, where duplicate (s, p, o) triples were removed ..
     for i, item in enumerate(sorted_re_preds):
+
+        # Get the subject, predicate, and object of the triple, where for each (s, o) pair we have all possible
+        # values for p ..
         relation = item["relation"]
         src, tgt = item["src"], item["tgt"]
+
+        # If the (s, p, o) triple appears in triples ..
         if (src, relation, tgt) in triples:
+            # Increment the 'correct' counter
             correct += 1
+
+        # P = list of [nb_correct_predictions / nb_predictions so far]
+        # R = list of [nb_correct_predictions / nb_triples]
         P.append(float(correct) / float(i + 1))
         R.append(float(correct) / float(total))
 
+    # Compute AUC, and F1
     auc = metrics.auc(x=R, y=P)
     P = np.array(P)
     R = np.array(R)
@@ -159,19 +183,29 @@ def compute_metrics(logits, labels, groups, set_type, logger, ent_types=False):
     # Accuracy
     na_idx = rel2idx["na"]
 
+    # Get the prediction with the highest probability; (I think the torch.nn.Softmax here can be omitted)
     preds = torch.argmax(torch.nn.Softmax(-1)(logits), -1)
+
+    # Compute the accuracy -- discrepancy between predicted and gold labels
     acc = float((preds == labels).long().sum()) / labels.size(0)
+
+    # Compute the total number of non-NA gold relations ..
     pos_total = (labels != na_idx).long().sum()
+
+    # For all non-NA gold labels, number of times that the predict label and the gold label match
     pos_correct = ((preds == labels).long() * (labels != na_idx).long()).sum()
+
     if pos_total > 0:
+        # Accuracy for non-NA relations
         pos_acc = float(pos_correct) / float(pos_total)
     else:
         pos_acc = 0
+
     logger.info(" accuracy = %s", str(acc))
     logger.info(" pos_accuracy = %s", str(pos_acc))
 
-    results = {"P": list(P[:5]), "R": list(R[:5]), "F1": f1, "AUC": auc, "accuracy: ": str(acc),
-               "pos_accuracy: ": str(pos_acc)}
+    # Return a dict with all the results
+    results = {"P": list(P[:5]), "R": list(R[:5]), "F1": f1, "AUC": auc, "accuracy: ": str(acc), "pos_accuracy: ": str(pos_acc)}
     results.update(added_metrics)
 
     return results
@@ -234,17 +268,34 @@ def convert_names_to_cuis(l_names):
     return lc
 
 
+#
 # cf. https://stackoverflow.com/a/480227
-def non_dup_ordered_seq(seq):
+#
+# "seq" is a sequence of Dict where the key are details of a given prediction, including the "score", and the value
+# is the source or target entity, or the considered relation type "relation"
+#
+def non_dup_ordered_seq(seq: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
     seen = set()
     seen_add = seen.add
-    non_dup_seq = list()
+
+    # Create a list of predictions such that the triple in the prediction (subject and object entities, and possible
+    # relation type) are unique
+    non_dup_seq: List[Dict[str, Any]] = list()
+
+    # For each of the predictions ..
     for item in seq:
+        # Extract the subject, predicate, and object of the triple ..
+        # Here 'relation' appears with all its possible values in 'seq'
         relation = item["relation"]
         src, tgt = item["src"], item["tgt"]
+
+        # Build the triple ..
         triple = (src, relation, tgt)
+
+        # If the triple appears for the first time, add the prediction dictionary to non_dup_seq
         if not (triple in seen or seen_add(triple)):
             non_dup_seq.append(item)
+
     return non_dup_seq
 
 
@@ -269,16 +320,9 @@ def evaluate(model, logger, set_type: str = "dev", prefix: str = "", ent_types: 
     nb_eval_steps = 0
     eval_logits, eval_labels, eval_preds, eval_groups, eval_dirs, eval_names = [], [], [], [], [], []
 
-    # debug_iteration = 0
-
     # For each batch in the dataset ...
     for batch in tqdm(eval_dataloader, desc="Evaluating"):
         model.eval()
-
-        # XXX debug, get rid of this
-        # debug_iteration += 1
-        # if debug_iteration > 10:
-        #     break
 
         # Move the batches to GPU ..
         batch = tuple(t.to(config.device) for t in batch)
@@ -286,10 +330,10 @@ def evaluate(model, logger, set_type: str = "dev", prefix: str = "", ent_types: 
         with torch.inference_mode():
             # Create the inputs dictionary with input_ids, entity_ids, etc.
             inputs = {
-                "input_ids": batch[0], # [1, 16, 128], so I think it's [B, G, MAX_SEQ_LEN]
-                "entity_ids": batch[1], # [1, 16, 128], so I think it's [B, G, MAX_SEQ_LEN]
-                "attention_mask": batch[2], # [1, 16, 128], so I think it's [B, G, MAX_SEQ_LEN]
-                "labels": batch[4], # [1], so I think it's [B]
+                "input_ids": batch[0],  # [1, 16, 128], so I think it's [B, G, MAX_SEQ_LEN]
+                "entity_ids": batch[1],  # [1, 16, 128], so I think it's [B, G, MAX_SEQ_LEN]
+                "attention_mask": batch[2],  # [1, 16, 128], so I think it's [B, G, MAX_SEQ_LEN]
+                "labels": batch[4],  # [1], so I think it's [B]
                 "is_train": False
             }
 
@@ -327,7 +371,7 @@ def evaluate(model, logger, set_type: str = "dev", prefix: str = "", ent_types: 
         'labels': torch.cat(eval_labels),  # B gold labels -> [B * N]
         'logits': torch.cat(eval_logits),  # B x C, predicted logits -> [B * N, C]
         'preds': np.asarray(eval_preds),  # B predicted labels -> [N] Numpy array, since B=1
-        'groups': torch.cat(eval_groups)  # B x 2, I think these are source and target entities of the triples
+        'groups': torch.cat(eval_groups)  # B x 2, [B * N, 2] -- I think these are source and target entities of the triples
     }
     # -> now eval['groups'] will look like [B * N, 2]
 
@@ -358,7 +402,8 @@ def evaluate(model, logger, set_type: str = "dev", prefix: str = "", ent_types: 
 
     logger.info('Accuracy (including "NA"): {}\nP: {}, R: {}, F1: {}'.format(a, p, r, f1))
 
-    results = {}
+    results: Dict[str, Dict[str, Any]] = {}
+
     results['new_results'] = {
         'acc_with_na': a,
         'scikit_precision': p,
@@ -372,6 +417,7 @@ def evaluate(model, logger, set_type: str = "dev", prefix: str = "", ent_types: 
     #   - eval['logits'] is [B * N, C]
     #   - eval['labels'] is [B * N]
     #   - eval['names'] is [B * N, G, 2]
+    #   - eval['gropups'] is [B * N, 2]
 
     # I am pretty sure the third argument here is not eval['names'] but eval['groups']
     # results['original'] = compute_metrics(eval['logits'], eval['labels'], eval['names'], set_type, logger, ent_types=ent_types)
