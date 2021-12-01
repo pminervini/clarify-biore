@@ -264,6 +264,90 @@ body space or junction	superior_to	body space or junction
 - `tools/6_generate_features.py`
   - Input: `entities.txt`, `relations.txt`, `complete_train/dev/test.txt`
   - Output: `train/dev/test.pt`
+  - Description: featurises the input instances.
+
+More specifically, each line in `complete_train/dev/test.txt` looks like this:
+
+```json
+{
+  "group": [
+    "screw loosening",
+    "plate fracture"
+  ],
+  "relation": "temporally_followed_by",
+  "sentences": [
+    "Radiographically, the approximation of fracture fragments, ^plate fracture^ and $screw loosening$ on orthopantomograph and Reverse Towne's view were evaluated at intervals of 24 h, six weeks and three months postoperatively.",
+    "It is important to establish the time-related risk of complications such as ^plate fracture^ or $screw loosening$.",
+    "The average time frame until a hardware failure (^plate fracture^, $screw loosening$) occurs is 14 months.",
+    "We found 11.3% complications due to ^plate fracture^, plate torsion, or $screw loosening$.",
+    "From a review of the literature, it is evident that the technique used most frequently for fixation is the positioning of a single plate despite complications concerning ^plate fracture^ or $screw loosening$ have been reported by various authors.",
+    "In 52% of patients, fracture healing was uneventful; however, in 48% of patients, complications were encountered, including osteomyelitis, nonunion, ^plate fracture^, $screw loosening$, and dehiscences with subsequent infections.",
+    "The use of second-generation locking reconstruction plates for the treatment of mandibular continuity defects has a 36% complication rate, which includes ^plate fracture^, $screw loosening$, plate exposure, wound infection and malocclusion.",
+    "In 52% of patients, fracture healing was uneventful; however, in 48% of patients, complications were encountered, including osteomyelitis, nonunion, ^plate fracture^, $screw loosening$, and dehiscences with subsequent infections.",
+    "We found 11.3% complications due to ^plate fracture^, plate torsion, or $screw loosening$.",
+    "The use of second-generation locking reconstruction plates for the treatment of mandibular continuity defects has a 36% complication rate, which includes ^plate fracture^, $screw loosening$, plate exposure, wound infection and malocclusion.",
+    "It is important to establish the time-related risk of complications such as ^plate fracture^ or $screw loosening$.",
+    "Radiographically, the approximation of fracture fragments, ^plate fracture^ and $screw loosening$ on orthopantomograph and Reverse Towne's view were evaluated at intervals of 24 h, six weeks and three months postoperatively.",
+    "The average time frame until a hardware failure (^plate fracture^, $screw loosening$) occurs is 14 months.",
+    "The use of second-generation locking reconstruction plates for the treatment of mandibular continuity defects has a 36% complication rate, which includes ^plate fracture^, $screw loosening$, plate exposure, wound infection and malocclusion.",
+    "It is important to establish the time-related risk of complications such as ^plate fracture^ or $screw loosening$.",
+    "The average time frame until a hardware failure (^plate fracture^, $screw loosening$) occurs is 14 months."
+  ],
+  "e1": null,
+  "e2": null,
+  "reldir": 0
+}
+```
+
+While each featurised instance looks like this:
+
+```python
+    features = [dict(
+        input_ids=torch.cat(input_ids),
+        entity_ids=torch.cat(entity_ids),
+        attention_mask=torch.cat(attention_mask),
+        label=relation2idx[relation.lower()],
+        group=group,
+    ), ]
+```
+
+And more specifically, looks like this:
+
+```json
+{
+  'input_ids': tensor([[  101,  2664, 25582,  ...,     0,     0,     0],
+         [  101,  1135,  1110,  ...,     0,     0,     0],
+         [  101,  1109,  1903,  ...,     0,     0,     0],
+         ...,
+         [  101,  1109,  1329,  ...,     0,     0,     0],
+         [  101,  1135,  1110,  ...,     0,     0,     0],
+         [  101,  1109,  1903,  ...,     0,     0,     0]]),
+ 'entity_ids': tensor([[0., 0., 0.,  ..., 0., 0., 0.],
+         [0., 0., 0.,  ..., 0., 0., 0.],
+         [0., 0., 0.,  ..., 0., 0., 0.],
+         ...,
+         [0., 0., 0.,  ..., 0., 0., 0.],
+         [0., 0., 0.,  ..., 0., 0., 0.],
+         [0., 0., 0.,  ..., 0., 0., 0.]]),
+ 'attention_mask': tensor([[1, 1, 1,  ..., 0, 0, 0],
+         [1, 1, 1,  ..., 0, 0, 0],
+         [1, 1, 1,  ..., 0, 0, 0],
+         ...,
+         [1, 1, 1,  ..., 0, 0, 0],
+         [1, 1, 1,  ..., 0, 0, 0],
+         [1, 1, 1,  ..., 0, 0, 0]]),
+ 'label': 227,
+ 'group': (26861, 7812)
+}
+```
+
+The shapes of each featurised instance are the following:
+
+```json
+train[0]['input_ids'].shape: torch.Size([16, 128])
+train[0]['entity_ids'].shape: torch.Size([16, 128])
+train[0]['attention_mask'].shape: torch.Size([16, 128])
+```
 
 - `tools/7_generate_abstracted_features.py`
   - Input: `entities.txt`, `relations.txt`, `complete_types_train/dev/test.txt`
