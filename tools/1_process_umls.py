@@ -9,6 +9,8 @@ from nltk.corpus import stopwords
 
 import config
 
+from typing import Dict, Tuple
+
 STOPWORDS = set(stopwords.words('english'))
 
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
@@ -44,7 +46,7 @@ def process_types(mrsty_file):
     return cui_to_entity_types
 
 
-def process_rels(mrrel_file, ro_only=True):
+def process_rels(mrrel_file: str, ro_only: bool = True) -> Dict[str, Tuple[str, str]]:
     """Reads UMLS relation triples file MRREL.2019.RRF.
 
     Use ``ro_only`` to consider relations of "RO" semantic type only.

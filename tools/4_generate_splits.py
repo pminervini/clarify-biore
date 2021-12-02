@@ -66,13 +66,12 @@ def get_groups_texts_from_umls_vocab(relation_text_to_groups: Dict[str, Set[Tupl
     return groups_texts
 
 
-def align_groups_to_sentences(groups_texts: Set[str],
-                              jsonl_fname: str,
-                              output_fname: str) -> Tuple[Set[str], Set[str]]:
+def align_groups_to_sentences(groups_texts: Set[str],  # Set of tab-separated sentence pairs
+                              jsonl_fname: str,  # Input file: umls.linked_sentences.jsonl
+                              output_fname: str) -> Tuple[Set[str], Set[str]]:  # Output file: umls.linked_sentences_to_groups.jsonl
     jr = JsonlReader(jsonl_fname)
 
     with open(output_fname, "w", encoding="utf-8", errors="ignore") as wf:
-
         logger.info("Aligning texts (sentences) to groups ...")
         pos_groups: Set[str] = set()
         neg_groups: Set[str] = set()
@@ -554,7 +553,8 @@ if __name__ == "__main__":
 
     # 1. Collect all possible group texts from their CUIs
     # Returns a set of all tab-separated pairs of surface forms of related CUIs
-    groups_texts: Set[str] = get_groups_texts_from_umls_vocab(relation_text_to_groups, cui_to_entity_texts, config.reltext_all_combos, load_existing=True)
+    groups_texts: Set[str] = get_groups_texts_from_umls_vocab(relation_text_to_groups, cui_to_entity_texts,
+                                                              config.reltext_all_combos, load_existing=True)
 
     # lower extremity	monoplegia of nondominant lower limb as a late effect of cerebrovascular accident (disorder)
     # paraffinum liquidum	mineral oil / phenolphthalein lozenge product
@@ -562,13 +562,11 @@ if __name__ == "__main__":
     # cerebrospinal fluid, nos	cv b5 ab titr csf
     # product containing acyclovir 200 mg/1 each oral capsule	eryth
 
-    # breakpoint()
-
     # 2. Search for text alignment of groups (this can take up to 80~90 mins)
     # Generates two sets of tab-separated pairs of CUI surface forms, one with related and one with unrelated pairs
-    pos_groups, neg_groups = align_groups_to_sentences(groups_texts, config.medline_linked_sents_file, config.groups_linked_sents_file)
-
-    # breakpoint()
+    pos_groups, neg_groups = align_groups_to_sentences(groups_texts, # Set of tab-separated sentence pairs
+                                                       config.medline_linked_sents_file,  # Input file: umls.linked_sentences.jsonl
+                                                       config.groups_linked_sents_file)  # Output file: umls.linked_sentences_to_groups.jsonl
 
     del groups_texts
     import gc
