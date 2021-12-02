@@ -38,6 +38,23 @@ Pipeline:
   - Output: `triples_all.tsv`, `complete_train/dev/test.txt`, `triples_train/dev/test.tsv`, `entities.txt`, `relations.txt`
   - Description: generates the train/validation/test splits. While doing so, it generates `umls.reltxt_all_combos.pkl`, which is a large set of `e1\te2` strings, where `e1` and `e2` are the surface forms of two entities that are linked together. It also generates `umls.linked_sentences_to_groups.jsonl`.
 
+The pickle file `umls.reltxt_all_combos.pkl` contains a set of tab-separated entity-name pairs, which looks as follows:
+
+```tsv
+systems, signal transduction	s100a8 wt allele
+rubbing alcohol fluoxetine	90mg capsule delayed release
+serotonin antagonists	ergometrine maleate (substance)
+biologicentity	unknown living organism (organism)
+multidrug resistance process	pharmacologic substance
+sodium monofluorophosphate 7.6 mg in 1 g dental paste, dentifrice [bee smart]	product containing zinc oxide
+general physical exam	breast lump palpable
+ewing's sarcoma (morphologic abnormality)	ewsr1-etv4 fusion protein expression
+mycophenolate mofetil 500 mg oral tablet, film coated	mycophenolic acid-containing product
+congen abnorm	congenital sequestration of lung
+dental crowding	bardet-biedl syndrome 1
+vit-c 30 mg / cholecalciferol 1000 unt / cuprous oxide 2 mg / folate 1 mg / magnesium oxide 20 mg / vit-b3 15 mg / polysaccharide iron complex 29 mg / pot iodide 0.15 mg / vit-b6 hydrochloride 2.5 mg / riboflavin 1.8 mg / vit-b1 mononitrate 1.6 mg / vitamin a 1100 unt / vitamin b 12 0.012 mg / vitamin e 20 unt / zno 25 mg oral capsule [vitafol-one]	product containing zinc (product)
+```
+
 Each element in `umls.linked_sentences_to_groups.jsonl` looks like this, where `groups` contains positive and negative examples of related entity pairs, where negative examples are not related in the Knowledge Base.
 
 ```json
