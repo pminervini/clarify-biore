@@ -6,7 +6,7 @@ import json
 import pickle
 import logging
 
-from typing import Iterable, List, Dict, Set, Tuple, Any
+from typing import List, Dict, Set, Tuple, Any
 
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
