@@ -160,3 +160,5 @@ max_steps = 150000
 early_stop = 20
 
 use_orig_sents = True
+
+use_entity_types = False

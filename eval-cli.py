@@ -73,7 +73,7 @@ def long_tail_split(all, upper_20=False):
 def evaluate_test(model, model_dir, set_type="test",
                   load_eval: bool = False,
                   run_label: str = ''):
-    eval_dataset = load_dataset(set_type, logger, ent_types=True)
+    eval_dataset = load_dataset(set_type, logger, ent_types=config.use_entity_types)
     eval_sampler = SequentialSampler(eval_dataset)
     eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=config.eval_batch_size)
 
@@ -226,7 +226,7 @@ def evaluate_test(model, model_dir, set_type="test",
 
     # What's the shape of eval['groups'] here ? It's [36756, 2]
     results['original'] = compute_metrics(eval['logits'], eval['labels'], eval['groups'], set_type, logger,
-                                          ent_types=True)
+                                          ent_types=config.use_entity_types)
     results["loss"] = eval_loss
     logger.info("Results: %s", results)
 

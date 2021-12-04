@@ -156,7 +156,7 @@ def train(train_dataset: TensorDataset, model: BertForDistantRE):
                     logs = {}
 
                     # Evaluate the model ...
-                    results = evaluate(model, logger, "dev", ent_types=True)
+                    results = evaluate(model, logger, "dev", ent_types=config.use_entity_types)
 
                     for key, value in results["original"].items():
                         eval_key = "eval_{}".format(key)
@@ -225,7 +225,9 @@ def train(train_dataset: TensorDataset, model: BertForDistantRE):
             train_iterator.close()
             break
 
-    results = evaluate(model, logger, set_type="dev", prefix="final-{}".format(global_step), ent_types=True)
+    results = evaluate(model, logger, set_type="dev", prefix="final-{}".format(global_step),
+                       ent_types=config.use_entity_types)
+
     if results["new_results"]["scikit_f1"] > best_f1:
         best_results = results
         best_f1 = results["new_results"]["scikit_f1"]
@@ -262,7 +264,7 @@ def main():
     # Training
 
     # This loads the dataset in a TensorDataset
-    train_dataset: TensorDataset = load_dataset("train", logger, ent_types=True)
+    train_dataset: TensorDataset = load_dataset("train", logger, ent_types=config.use_entity_types)
 
     # Train the model
     global_step, tr_loss, tr_data = train(train_dataset, model)
@@ -281,7 +283,7 @@ def main():
     model.load_state_dict(torch.load(config.test_ckpt + "/pytorch_model.bin"))
     model.to(config.device)
 
-    results = evaluate(model, logger, "test", prefix="TEST", ent_types=True)
+    results = evaluate(model, logger, "test", prefix="TEST", ent_types=config.use_entity_types)
 
     with open(os.path.join(config.test_ckpt, "pr_metrics.txt"), "w") as wf:
         json.dump(str(results), wf)

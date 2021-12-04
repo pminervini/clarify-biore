@@ -72,9 +72,9 @@ def process_rels(mrrel_file: str, ro_only: bool = True) -> Dict[str, Tuple[str, 
             if line[3] != "RO" and ro_only:
                 continue
 
-            e1_id = line[0]
-            e2_id = line[4]
-            rel_text = line[7].strip()
+            e1_id: str = line[0]
+            e2_id: str = line[4]
+            rel_text: str = line[7].strip()
 
             # considering relations with textual descriptions only
             if not rel_text:
