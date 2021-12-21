@@ -29,7 +29,7 @@ Experiment settings
 # P: entire sequence avg
 # Q: [CLS] + entire sequence avg
 
-rel_embedding = 'A'
+rel_embedding = 'L'
 
 # Bag sentence attention or bag sentence average
 bag_representations = "avg"

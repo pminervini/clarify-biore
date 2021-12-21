@@ -17,7 +17,7 @@ logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=lo
 logger = logging.getLogger(__name__)
 
 
-def process_types(mrsty_file):
+def process_types(mrsty_file: str):
     """Reads UMLS semantic types file MRSTY.2019.RRF.
     For details on each column, please check: https://www.ncbi.nlm.nih.gov/books/NBK9685/
     """

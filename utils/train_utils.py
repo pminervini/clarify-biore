@@ -105,7 +105,8 @@ def compute_metrics(logits, labels, groups, set_type, logger, ent_types=False) -
             triples.add((entity2idx[src], rel, entity2idx[tgt]))
 
     # RE predictions
-    probas = logits # [B * N, C]
+    # [B * N, C]
+    probas = torch.nn.Softmax(-1)(logits).squeeze()
     re_preds = list()
 
     # For each of the B * N instances ..
@@ -115,8 +116,6 @@ def compute_metrics(logits, labels, groups, set_type, logger, ent_types=False) -
 
         # Let's get the two items from the group, ie. the source and the target entities ..
         src, tgt = group[0].item(), group[1].item()
-
-        top_prediction = torch.argmax(probas[i])
 
         # For each possible relation types ..
         for rel, rel_idx in rel2idx.items():
@@ -176,8 +175,12 @@ def compute_metrics(logits, labels, groups, set_type, logger, ent_types=False) -
 
     # Added metrics
     added_metrics = {}
+    for n in range(100, 1000, 100): # 100, 200, etc recall
+        added_metrics['P@{}'.format(n)] = sum(P[:n]) / n
+
     for n in range(2000, total, 2000):
         added_metrics['P@{}'.format(n)] = sum(P[:n]) / n
+
     added_metrics['P@{}'.format(total)] = sum(P[:total]) / total
 
     # Accuracy
@@ -205,13 +208,25 @@ def compute_metrics(logits, labels, groups, set_type, logger, ent_types=False) -
     logger.info(" pos_accuracy = %s", str(pos_acc))
 
     # Return a dict with all the results
-    results = {"P": list(P[:5]), "R": list(R[:5]), "F1": f1, "AUC": auc, "accuracy: ": str(acc), "pos_accuracy: ": str(pos_acc)}
+    results = {
+        "P": list(P[:5]),
+        "R": list(R[:5]),
+        "F1": f1,
+        "AUC": auc,
+        "accuracy: ": str(acc),
+        "pos_accuracy: ": str(pos_acc)
+    }
+
     results.update(added_metrics)
 
     return results
 
 
-def save_eval_results(results, eval_dir, set_type, logger, prefix=""):
+def save_eval_results(results,
+                      eval_dir,
+                      set_type,
+                      logger,
+                      prefix=""):
     os.makedirs(eval_dir, exist_ok=True)
     output_eval_file = os.path.join(eval_dir, "eval_results.txt")
 
@@ -222,17 +237,21 @@ def save_eval_results(results, eval_dir, set_type, logger, prefix=""):
             wf.write("%s = %s\n" % (key, str(results[key])))
 
 
-def load_dataset(set_type: str, logger, ent_types: bool = False) -> TensorDataset:
+def load_dataset(set_type: str,
+                 logger,
+                 ent_types: bool = False) -> TensorDataset:
     if set_type == "train":
         if ent_types:
             features_file = config.feats_file_types_train
         else:
             features_file = config.feats_file_train
+
     elif set_type == "dev":
         if ent_types:
             features_file = config.feats_file_types_dev
         else:
             features_file = config.feats_file_dev
+
     else:
         if ent_types:
             features_file = config.feats_file_types_test

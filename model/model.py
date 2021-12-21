@@ -77,6 +77,7 @@ class BertForDistantRE(BertPreTrainedModel):
         idx_e1_start = torch.argmax(ent_ids_copy, dim=2)  # index of first '1' (start of tail ent)
         e1_len = torch.count_nonzero(ent_ids_copy, dim=2) - 1
         idx_e1_end = idx_e1_start + e1_len
+        idx_e1_end.to(self.device)
 
         # E2 end:
         ent_ids_copy = entity_ids.detach().clone()
@@ -84,11 +85,11 @@ class BertForDistantRE(BertPreTrainedModel):
         idx_e2_start = torch.argmax(ent_ids_copy, dim=2)  # index of first '2' (start of tail ent)
         e2_len = torch.count_nonzero(ent_ids_copy, dim=2) - 1
         idx_e2_end = idx_e2_start + e2_len
+        idx_e2_end.to(self.device)
 
         # Create mask
-        e1_e_mask = torch.zeros((b * g, l)).scatter_(1, idx_e1_end.view(-1, 1), 1).resize(b, g, l)
-        e2_e_mask = torch.zeros((b * g, l)).scatter_(1, idx_e2_end.view(-1, 1), 1).resize(b, g, l)
-
+        e1_e_mask = torch.zeros((b * g, l)).to(self.device).scatter_(1, idx_e1_end.view(-1, 1), 1).resize(b, g, l)
+        e2_e_mask = torch.zeros((b * g, l)).to(self.device).scatter_(1, idx_e2_end.view(-1, 1), 1).resize(b, g, l)
         return e1_e_mask.to(self.device), e2_e_mask.to(self.device)
 
     def create_e_mid_mask(self, entity_ids):
@@ -183,7 +184,7 @@ class BertForDistantRE(BertPreTrainedModel):
             # E middle:
             create_e_mid_mask = self.create_e_mid_mask(entity_ids)
             e_mid = sequence_output * create_e_mid_mask.unsqueeze(-1)
-            e_mid = e_mid.sum(2) / e_mid.sum(2).unsqueeze(-1)
+            e_mid = e_mid.sum(2) / create_e_mid_mask.sum(2).unsqueeze(-1)
             e_mid = self.We(self.dropout(self.act(e_mid)))
 
         if self.rel_emb in ['P', 'Q']:
