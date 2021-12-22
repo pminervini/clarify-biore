@@ -161,4 +161,4 @@ early_stop = 20
 
 use_orig_sents = True
 
-use_entity_types = False
+use_entity_types = True
